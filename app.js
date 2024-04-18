@@ -1,16 +1,22 @@
 const express = require("express");
+const bodyParser = require('body-parser')
+const path = require('path');
 const mongoose = require("mongoose");
+require('dotenv').config();
 
-const app = express();
+const userRoutes = require('./routes/user.routes');
+const bookRoutes = require('./routes/book.routes');
 
 mongoose
   .connect(
-    "mongodb+srv://jonm:XBfGtgI0eEDSZL23@cluster0.qhch6ww.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0",
+    process.env.MONGO_URI,
     { useNewUrlParser: true,
       useUnifiedTopology: true }
   )
   .then(() => console.log("Connexion à MongoDB réussie !"))
   .catch(() => console.log("Connexion à MongoDB échouée"));
+
+const app = express();
 
 //Middlewares
 app.use((req, res, next) => {
@@ -25,5 +31,12 @@ app.use((req, res, next) => {
   );
   next();
 });
+
+app.use(bodyParser.json());
+
+app.use('/api/auth', userRoutes);
+app.use('/api', bookRoutes);
+
+app.use("/images", express.static(path.join(__dirname, "images")));
 
 module.exports = app;
