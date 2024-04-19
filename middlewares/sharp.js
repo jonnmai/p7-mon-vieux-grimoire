@@ -11,7 +11,7 @@ module.exports = (req, res, next) => {
     const outputPath = path.join(__dirname, "..", "images", outputFileName);
 
     sharp(req.file.buffer)
-      .toFormat("webp", { quality: 50 })
+      .toFormat("webp", { quality: 100 })
       .resize(300, 500, {
         fit: sharp.fit.inside,
         withoutEnlargement: true,

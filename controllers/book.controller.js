@@ -3,6 +3,7 @@ const Book = require('../models/Book');
 const fs = require('fs');
 const path = require('path');
 
+
 exports.getAllBooks = (req, res) => {
     Book.find()
       .then((books) => res.status(200).json(books))
@@ -14,6 +15,16 @@ exports.getOneBook = (req, res, next) => {
         .then((book) => res.status(200).json( book ))
         .catch((error) => res.status(400).json({ error }));
 }
+
+exports.getBestRating = (req, res, next) => {
+    Book.find()
+        .sort({ averageRating: -1 })  // Filter rating decrease
+        .limit(3)  
+        .then(topBooks => {
+            res.status(200).json(topBooks);  // Return 3 best books
+        })
+        .catch((error) => res.status(500).json({ error }));
+};
 
 exports.createBook = (req, res , next) => {
     const bookObject = JSON.parse(req.body.book);
@@ -74,4 +85,52 @@ exports.modifyBook = (req, res, next) => {
             }
         })
         .catch((error) => { res.status(400).json({ error })})
-}
+};
+
+exports.postRating = (req, res, next) => {
+    const rating = req.body.rating;
+    const userId = req.auth.userId;
+    const rateObject = { userId, grade: rating };
+
+    // Verify rated or not 
+    Book.findOne({ _id: req.params.id, "ratings.userId": userId })  //Need "" because in Js ' . ' is used to access objects properties but also in MongoDB for nested fields
+        .then(ratedBook => {
+            if (ratedBook) {
+                return res.status(400).json({ message: 'Vous avez déjà noté ce livre' });
+            }
+
+            // Ajouter la nouvelle note
+            Book.findByIdAndUpdate(
+                req.params.id,
+                { $push: { ratings: rateObject } },
+                { new: true } // return updated doc
+            )
+            .then(updatedBook => {
+                if (!updatedBook) {
+                    return res.status(404).json({ message: 'Livre non trouvé' });
+                }
+
+                // Maps on ratings[] to return the ratings in the ratingsArray array
+                const ratingsArray = updatedBook.ratings.map(rating => parseInt(rating.grade));
+                // console.log(ratingsArray);
+                const totalRatings = ratingsArray.reduce((acc, iteration) => acc + iteration, 0);  //pass on every array element and add it to the accumulator
+                const averageRating = totalRatings / updatedBook.ratings.length;
+
+                updatedBook.averageRating = averageRating;
+
+                updatedBook.save()
+                    .then(() => {
+                        res.status(200).json(updatedBook);
+                    })
+                    .catch(error => {
+                        res.status(500).json({ error: 'Erreur lors de la mise à jour de la moyenne des notes' });
+                    });
+            })
+            .catch(error => {
+                res.status(500).json({ error: 'Erreur lors de l\'ajout de la note' });
+            });
+        })
+        .catch(error => {
+            res.status(500).json({ error: 'Erreur lors de la vérification de la note précédente' });
+        });
+};
